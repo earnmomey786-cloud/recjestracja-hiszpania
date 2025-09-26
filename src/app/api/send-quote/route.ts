@@ -8,34 +8,53 @@ import { Readable } from 'stream';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Iniciando procesamiento de solicitud send-quote');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+
     // Cambiar de JSON a FormData para recibir archivos
     const formData = await request.formData();
+    console.log('FormData recibido');
     const fullName = formData.get('fullName') as string;
     const email = formData.get('email') as string;
     const phone = formData.get('phone') as string;
     const fileCount = parseInt(formData.get('fileCount') as string || '0');
 
-    // EN DESARROLLO: Solo imprime en consola
     // Procesar archivos del FormData
     const files = [];
     const fileAttachments = [];
 
     for (let [key, value] of formData.entries()) {
-      if (key.startsWith('files[') && value instanceof File) {
-        const file = value as File;
+      if (key.startsWith('files[') && value && typeof value === 'object' && 'name' in value && 'size' in value) {
+        const file = value as any;
         files.push(file);
 
-        const buffer = Buffer.from(await file.arrayBuffer());
+        // Procesar archivo de manera segura
+        let buffer: Buffer;
+        let contentType: string;
+
+        if (typeof file.arrayBuffer === 'function') {
+          buffer = Buffer.from(await file.arrayBuffer());
+          contentType = file.type || 'application/octet-stream';
+        } else if (file instanceof Buffer) {
+          buffer = file;
+          contentType = 'application/octet-stream';
+        } else {
+          // Si no es un archivo válido, saltar
+          continue;
+        }
+
         fileAttachments.push({
-          filename: file.name,
+          filename: file.name || 'archivo',
           content: buffer,
-          contentType: file.type
+          contentType: contentType
         });
       }
     }
 
-    // EN DESARROLLO: Solo imprime en consola
-    if (process.env.NODE_ENV !== 'production') {
+    // ENVIAR EMAILS REALES
+    const shouldSimulate = false;
+
+    if (shouldSimulate) {
       console.log('🚀 === EMAIL SIMULADO (DESARROLLO) ===');
 
       console.log('\n📧 EMAIL AL CLIENTE:');
@@ -84,11 +103,13 @@ export async function POST(request: NextRequest) {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
-      // Configuración para hosting compartido
+      // Configuración mejorada para Docker
       tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false
-      }
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      },
+      debug: true,
+      logger: true
     });
 
     // Preparar información de archivos para el email
@@ -215,10 +236,11 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error procesando solicitud:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Error procesando solicitud'
-    }, { status: 500 });
-  }
+   console.error('Error procesando solicitud:', error);
+   console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+   return NextResponse.json({
+     success: false,
+     error: `Error procesando solicitud: ${error instanceof Error ? error.message : 'Unknown error'}`
+   }, { status: 500 });
+ }
 }
