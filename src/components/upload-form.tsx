@@ -231,12 +231,9 @@ export default function UploadForm() {
 
         setUploadProgress(70); // Archivos preparados
 
-        // Enviar a Firebase Functions
-        const response = await fetch('https://us-central1-rejestracja-hiszpania.cloudfunctions.net/sendEmail', {
+        // Enviar a la API local
+        const response = await fetch('/api/send-quote', {
             method: 'POST',
-            headers: {
-                'Accept': 'application/json'
-            },
             body: formDataToSend,
         });
 

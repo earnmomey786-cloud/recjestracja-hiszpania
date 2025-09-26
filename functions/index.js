@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const nodemailer = require('nodemailer');
+const multer = require('multer');
 
 const createTransporter = () => {
   console.log('SMTP Config:', {
@@ -12,25 +13,34 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: functions.config().smtp.host,
     port: parseInt(functions.config().smtp.port),
-    secure: true,
+    secure: false, // STARTTLS
     auth: {
       user: functions.config().smtp.user,
       pass: functions.config().smtp.pass
     },
     tls: {
-      rejectUnauthorized: false
+      ciphers: 'SSLv3'
     },
     debug: true
   });
 };
 
-exports.sendEmail = functions.https.onRequest(async (req, res) => {
+// Configurar multer para archivos
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB por archivo
+    files: 10 // máximo 10 archivos
+  }
+});
+
+exports.sendEmail = functions.https.onRequest(upload.array('files'), async (req, res) => {
   // Habilitar CORS
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Max-Age', '3600');
-  
+
   if (req.method === 'OPTIONS') {
     res.status(204).send('');
     return;
@@ -43,7 +53,8 @@ exports.sendEmail = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    const { fullName, email, phone, files } = req.body;
+    const { fullName, email, phone } = req.body;
+    const files = req.files || [];
     const config = functions.config().smtp;
     const transporter = createTransporter();
 
@@ -78,6 +89,13 @@ exports.sendEmail = functions.https.onRequest(async (req, res) => {
       `
     });
 
+    // Preparar adjuntos
+    const attachments = files.map((file, index) => ({
+      filename: file.originalname,
+      content: file.buffer,
+      contentType: file.mimetype
+    }));
+
     // Email al administrador
     await transporter.sendMail({
       from: config.from,
@@ -92,9 +110,11 @@ exports.sendEmail = functions.https.onRequest(async (req, res) => {
             <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
             <p><strong>Teléfono:</strong> <a href="tel:${phone}">${phone}</a></p>
             <p><strong>Fecha/Hora:</strong> ${new Date().toLocaleString('es-ES')}</p>
+            <p><strong>Archivos adjuntos:</strong> ${files.length} archivo(s)</p>
           </div>
         </div>
-      `
+      `,
+      attachments: attachments
     });
 
     res.status(200).json({ success: true });
