@@ -1,7 +1,6 @@
-import type {NextConfig} from 'next';
-
-const nextConfig: NextConfig = {
-  // Se quitó `output: 'export'` para permitir SSR y que funcionen las API routes
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Configuración en JavaScript para evitar que Next intente transpilar next.config.ts en runtime
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,7 +8,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true,  // Necesario para exportación estática
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -27,4 +26,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
