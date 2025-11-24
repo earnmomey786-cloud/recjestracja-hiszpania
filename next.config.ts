@@ -1,7 +1,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export',  // Exporta como estático
+  // Se quitó `output: 'export'` para permitir SSR y que funcionen las API routes
   typescript: {
     ignoreBuildErrors: true,
   },
